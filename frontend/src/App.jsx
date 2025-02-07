@@ -4,6 +4,8 @@ import axios from "axios";
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [fileType, setFileType] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0); // State for progress
+
   const getPreSignedUrl = async (fileName, fileType) => {
     return await axios.post("http://localhost:3000/archive/presigned-url", {
       fileName,
@@ -26,10 +28,23 @@ const App = () => {
       }, 1000); // Update every second
 
       const res = await getPreSignedUrl(file.name, file.type);
-      await axios.put(res.data.data, file);
+      // await axios.put(res.data.data, file);
+
+      // Step 2: Upload File using Axios with progress tracking
+      await axios.put(res.data.data, file, {
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(percentCompleted);
+        },
+      });
+
       const uploadedFile = await makeFilePublic(file.name);
       clearInterval(interval);
       console.log(`Total Upload Time: ${elapsedTime} seconds`);
+      // Reset progress after upload completes
+      setUploadProgress(100);
       setFileType(file.type);
       setUploadedFileUrl(uploadedFile.data.data);
     } catch (error) {
@@ -53,6 +68,18 @@ const App = () => {
     <div>
       App
       <input type="file" onChange={(e) => uploadFile(e.target.files[0])} />
+      {/* Progress Bar */}
+      {uploadProgress > 0 && (
+        <div style={{ width: "100%", background: "#ccc", marginTop: "10px" }}>
+          <div
+            style={{
+              width: `${uploadProgress}%`,
+              background: "green",
+              height: "10px",
+            }}
+          />
+        </div>
+      )}
       {uploadedFileUrl && filePreview(fileType, uploadedFileUrl)}
     </div>
   );
