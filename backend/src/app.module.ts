@@ -2,15 +2,16 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
-import { MemoryStoredFile, NestjsFormDataModule } from 'nestjs-form-data';
-import { AWSService } from './core/aws/aws.service';
+import { ArchiveModule } from './archive/archive.module';
+import { CoreModule } from './core/module';
 
 @Module({
   imports: [
+    CoreModule,
     ConfigModule.forRoot(),
-    NestjsFormDataModule.config({ storage: MemoryStoredFile }), // Configure global form-data settings
+    ArchiveModule,
   ],
   controllers: [AppController],
-  providers: [AppService, AWSService],
+  providers: [AppService],
 })
 export class AppModule {}
