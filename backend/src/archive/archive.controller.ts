@@ -33,34 +33,34 @@ export class ArchiveController {
   //   }
   // }
 
-    @Post('/presigned-url')
-    async presignedUrl(@Body() body) {
-      console.log('body chc:', body);
-      try {
-        return await this.archiveService.createPreSignedUrl(
-          body.fileName,
-          body.totalChunks,
-        );
-      } catch (error) {
-        console.error('Error creating pre-signed URL:', error);
-        throw new Error('Problem creating pre-signed URL');
-      }
+  @Post('/presigned-url')
+  async presignedUrl(@Body() body) {
+    console.log('body chc:', body);
+    try {
+      return await this.archiveService.createPreSignedUrl(
+        body.fileName,
+        body.totalChunks,
+      );
+    } catch (error) {
+      console.error('Error creating pre-signed URL:', error);
+      throw new Error('Problem creating pre-signed URL');
     }
+  }
 
-    @Post('/complete-upload')
-    async completeUpload(@Body() body) {
-      try {
-        await this.archiveService.completeMultipartUpload(
-          body.fileName,
-          body.uploadId,
-          body.parts,
-        );
+  @Post('/complete-upload')
+  async completeUpload(@Body() body) {
+    try {
+      await this.archiveService.completeMultipartUpload(
+        body.fileName,
+        body.uploadId,
+        body.parts,
+      );
 
-        await this.archiveService.makeFilePublic(body.fileName);
-      } catch (error) {
-        console.error('Error completing multipart upload:', error);
-        throw new Error('Failed to complete multipart upload.');
-      }
+      return await this.archiveService.makeFilePublic(body.fileName);
+    } catch (error) {
+      console.error('Error completing multipart upload:', error);
+      throw new Error('Failed to complete multipart upload.');
+    }
   }
 
   // @Get('/cors')

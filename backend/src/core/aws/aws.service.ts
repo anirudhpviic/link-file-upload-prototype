@@ -95,9 +95,9 @@ export class AWSService {
       const multipartUpload = await this.s3.send(multipartCommand);
       const uploadId = multipartUpload.UploadId;
 
-      console.log("uploadId", uploadId);
-      console.log("fileName", fileName);
-      console.log("totalChunks", totalChunks);
+      console.log('uploadId', uploadId);
+      console.log('fileName', fileName);
+      console.log('totalChunks', totalChunks);
 
       // Generate pre-signed URLs for each chunk
       const preSignedUrls = [];
@@ -112,7 +112,7 @@ export class AWSService {
         const signedUrl = await getSignedUrl(this.s3, uploadPartCommand, {
           expiresIn: 50000,
         }); // 1 hour expiration
-        console.log("pre-signed-url:", signedUrl);
+        console.log('pre-signed-url:', signedUrl);
         preSignedUrls.push({ partNumber, url: signedUrl });
       }
 
@@ -129,9 +129,9 @@ export class AWSService {
     parts: { PartNumber: number; ETag: string }[],
   ) {
     try {
-      console.log("uploadId", uploadId);
-      console.log("parts", parts);
-      console.log("fileName", fileName);
+      console.log('uploadId', uploadId);
+      console.log('parts', parts);
+      console.log('fileName', fileName);
       const completeCommand = new CompleteMultipartUploadCommand({
         Bucket: process.env.SPACES_BUCKET,
         Key: fileName,
@@ -160,7 +160,7 @@ export class AWSService {
       });
 
       await this.s3.send(command);
-      return `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_ENDPOINT}/${fileName}`;
+      return `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_ENDPOINT.replace(/^https:\/\//, '')}/${fileName}`;
     } catch (error) {
       console.error('Error making file public:', error);
       throw new Error('Failed to update file permissions.');
