@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import axios from "axios";
 import pLimit from "p-limit";
 
-const CHUNK_SIZE = 100 * 1024 * 1024;
+const CHUNK_SIZE = 10 * 1024 * 1024;
 
+// TODO: progress bar after reaching limit new api not showing
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [fileType, setFileType] = useState("");
@@ -80,6 +81,7 @@ const App = () => {
             onUploadProgress: (progressEvent) => {
               const chunkProgress =
                 (progressEvent.loaded / progressEvent.total) * 100;
+              console.log(chunkProgress);
               setUploadProgress((prevProgress) =>
                 chunkProgress > prevProgress ? chunkProgress : prevProgress
               );
