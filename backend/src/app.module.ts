@@ -10,6 +10,7 @@ import { CoreModule } from './core/module';
     CoreModule,
     ConfigModule.forRoot(),
     ArchiveModule,
+
   ],
   controllers: [AppController],
   providers: [AppService],

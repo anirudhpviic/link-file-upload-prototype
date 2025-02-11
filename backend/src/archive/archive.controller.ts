@@ -22,13 +22,11 @@ export class ArchiveController {
   @Post('/complete-upload')
   async completeUpload(@Body() body: CompleteFileUploadDto) {
     try {
-      await this.archiveService.completeMultipartUpload(
+      return await this.archiveService.completeMultipartUpload(
         body.fileName,
         body.uploadId,
         body.parts,
       );
-
-      return await this.archiveService.makeFilePublic(body.fileName);
     } catch (error) {
       throw new Error('Failed to complete multipart upload.');
     }
