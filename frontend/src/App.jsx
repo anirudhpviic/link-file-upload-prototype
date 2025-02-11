@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import axios from "axios";
+import pLimit from "p-limit";
 
-const CHUNK_SIZE = 12 * 1024 * 1024; // 5MB per chunk
+const CHUNK_SIZE = 100 * 1024 * 1024; // 12MB per chunk
 
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
@@ -31,55 +32,106 @@ const App = () => {
     return res.data.data; // public url
   };
 
+  // less than 5mb problem
+  // upload time problem
+  // const uploadFile = async (file) => {
+  //   try {
+  //     setUploadProgress(0);
+  //     const fileSize = file.size;
+  //     let uploadedBytes = 0;
+
+  //     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  //     // Get pre-signed URLs
+  //     const { uploadId, preSignedUrls } = await getPreSignedUrls(
+  //       file.name,
+  //       totalChunks
+  //     );
+
+  //     let uploadedParts = [];
+
+  //     await Promise.all(
+  //       preSignedUrls.map(async ({ partNumber, url }) => {
+  //         const start = (partNumber - 1) * CHUNK_SIZE;
+  //         const end = Math.min(start + CHUNK_SIZE, file.size);
+  //         const chunk = file.slice(start, end);
+
+  //         // correct upload progress
+  //         const res = await axios.put(url, chunk, {
+  //           onUploadProgress: (progressEvent) => {
+  //             if (progressEvent.progress) {
+  //               uploadedBytes += progressEvent.progress;
+  //               const progress = (uploadedBytes / fileSize) * 100;
+  //               console.log("uploadedBytes:", uploadedBytes);
+  //               console.log("file size:", fileSize);
+  //               console.log("Upload progress:", progress);
+
+  //               setUploadProgress(progress);
+  //             }
+  //           },
+  //         });
+
+  //         const eTag = res.headers["etag"]?.replace(/^"(.*)"$/, "$1");
+  //         uploadedParts.push({ PartNumber: partNumber, ETag: eTag });
+  //       })
+  //     );
+
+  //     // 3️⃣ Complete multipart upload
+  //     const publicUrl = await completeUpload(
+  //       file.name,
+  //       uploadId,
+  //       uploadedParts
+  //     );
+
+  //     setUploadedFileUrl(publicUrl);
+  //     setFileType(file.type);
+  //     setUploadProgress(100);
+  //   } catch (error) {
+  //     console.error("Upload failed:", error);
+  //   }
+  // };
+
   const uploadFile = async (file) => {
-    try {
-      setUploadProgress(0);
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    // const limit = pLimit(3); // Adjust this number to control parallel uploads
+    const limit = pLimit(6); // Try 6 or 8 instead of 3
 
-      // Get pre-signed URLs
-      const { uploadId, preSignedUrls } = await getPreSignedUrls(
-        file.name,
-        totalChunks
-      );
+    const fileSize = file.size;
+    let uploadedBytes = 0;
 
-      let uploadedParts = [];
-      // Upload each chunk
-      const uploadPromises = preSignedUrls.map(async ({ partNumber, url }) => {
-        const start = (partNumber - 1) * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunk = file.slice(start, end);
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const { uploadId, preSignedUrls } = await getPreSignedUrls(
+      file.name,
+      totalChunks
+    );
 
-        const res = await fetch(url, {
-          method: "PUT",
-          body: chunk,
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            setUploadProgress(percentCompleted);
-          },
-        });
+    let uploadedParts = [];
 
-        const eTag = res.headers.get("ETag");
-        const formattedETag = eTag.replace(/^"(.*)"$/, "$1");
-        uploadedParts.push({ PartNumber: partNumber, ETag: formattedETag });
-      });
+    await Promise.all(
+      preSignedUrls.map(({ partNumber, url }) =>
+        limit(async () => {
+          const start = (partNumber - 1) * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
 
-      await Promise.all(uploadPromises);
+          const res = await axios.put(url, chunk, {
+            onUploadProgress: (progressEvent) => {
+              const chunkProgress =
+                (progressEvent.loaded / progressEvent.total) * 100;
+              console.log(`Chunk ${partNumber} progress:`, chunkProgress);
+              setUploadProgress(chunkProgress);
+            },
+          });
 
-      // 3️⃣ Complete multipart upload
-      const publicUrl = await completeUpload(
-        file.name,
-        uploadId,
-        uploadedParts
-      );
+          const eTag = res.headers["etag"]?.replace(/^"(.*)"$/, "$1");
+          uploadedParts.push({ PartNumber: partNumber, ETag: eTag });
+        })
+      )
+    );
 
-      setUploadedFileUrl(publicUrl);
-      setFileType(file.type);
-      setUploadProgress(100);
-    } catch (error) {
-      console.error("Upload failed:", error);
-    }
+    const publicUrl = await completeUpload(file.name, uploadId, uploadedParts);
+    setUploadedFileUrl(publicUrl);
+    setFileType(file.type);
+    setUploadProgress(100);
   };
 
   // Displays file preview
@@ -96,18 +148,30 @@ const App = () => {
   };
 
   return (
-    <div>
+    <div style={{ width: "70%", height: "50vh", border: "1px solid yellow" }}>
       <h2>Chunked File Upload</h2>
       <input type="file" onChange={(e) => uploadFile(e.target.files[0])} />
 
       {/* Progress Bar */}
       {uploadProgress > 0 && (
-        <div style={{ width: "100%", background: "#ccc", marginTop: "10px" }}>
+        <div
+          style={{
+            width: "100%",
+            background: "#ddd",
+            marginTop: "10px",
+            borderRadius: "5px",
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
           <div
             style={{
               width: `${uploadProgress}%`,
+              maxWidth: "100%",
               background: "green",
               height: "10px",
+              borderRadius: "5px",
+              transition: "width 0.3s ease-in-out",
             }}
           />
         </div>
