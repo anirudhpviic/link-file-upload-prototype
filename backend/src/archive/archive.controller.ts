@@ -1,54 +1,26 @@
-import { Body, Controller, Get, Post, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
 import { ArchiveService } from './archive.service';
-import { AWSService } from 'src/core/aws/aws.service';
+import { CreatePresignedUrlDto } from './validators/create-presigned-url.dto';
+import { CompleteFileUploadDto } from './validators/complete-file-upload.dto';
 
 @Controller('archive')
 export class ArchiveController {
-  constructor(
-    private archiveService: ArchiveService,
-    // private readonly awsService: AWSService,
-  ) {}
-
-  // @Post('/presigned-url')
-  // async upload(@Body() body) {
-  //   console.log('body:', body);
-  //   try {
-  //     return await this.archiveService.createPreSignedUrl(
-  //       body.fileName,
-  //       body.fileType,
-  //     );
-  //   } catch (error) {
-  //     console.error('Error creating pre-signed URL:', error);
-  //     throw new Error('Problem creating pre-signed URL');
-  //   }
-  // }
-
-  // @Post('/make-file-public')
-  // async makePublic(@Body() body) {
-  //   try {
-  //     return await this.archiveService.makeFilePublic(body.fileName);
-  //   } catch (error) {
-  //     console.error('Error making file public:', error);
-  //     throw new Error('Failed to update file permissions.');
-  //   }
-  // }
+  constructor(private archiveService: ArchiveService) {}
 
   @Post('/presigned-url')
-  async presignedUrl(@Body() body) {
-    console.log('body chc:', body);
+  async createPreSignedUrl(@Body() body: CreatePresignedUrlDto) {
     try {
       return await this.archiveService.createPreSignedUrl(
         body.fileName,
         body.totalChunks,
       );
     } catch (error) {
-      console.error('Error creating pre-signed URL:', error);
       throw new Error('Problem creating pre-signed URL');
     }
   }
 
   @Post('/complete-upload')
-  async completeUpload(@Body() body) {
+  async completeUpload(@Body() body: CompleteFileUploadDto) {
     try {
       await this.archiveService.completeMultipartUpload(
         body.fileName,
@@ -58,18 +30,7 @@ export class ArchiveController {
 
       return await this.archiveService.makeFilePublic(body.fileName);
     } catch (error) {
-      console.error('Error completing multipart upload:', error);
       throw new Error('Failed to complete multipart upload.');
     }
   }
-
-  // @Get('/cors')
-  // async changeCors() {
-  //   try {
-  //     const res = await this.awsService.setCors();
-  //     console.log('cors res:', res);
-  //   } catch (error) {
-  //     throw new Error(`Failed to set CORS: ${error}`);
-  //   }
-  // }
 }
