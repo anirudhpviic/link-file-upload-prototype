@@ -2,9 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import pLimit from "p-limit";
 
-const CHUNK_SIZE = 10 * 1024 * 1024;
+const CHUNK_SIZE = 15 * 1024 * 1024;
 
-// TODO: progress bar after reaching limit new api not showing
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [fileType, setFileType] = useState("");
@@ -61,6 +60,10 @@ const App = () => {
 
   const uploadFile = async (file) => {
     const limit = pLimit(6); // 6 concurrent uploads
+    const fileBuffer = await file.arrayBuffer();
+    const fileBytes = fileBuffer.byteLength;
+
+    let chunkProgress = {}; // Store progress for each chunk
 
     const { chunks, totalChunks } = getDynamicChunks(file.size, CHUNK_SIZE);
 
@@ -71,6 +74,7 @@ const App = () => {
 
     let uploadedParts = [];
 
+    // parallel upload - max 6
     await Promise.all(
       preSignedUrls.map(({ partNumber, url }, index) =>
         limit(async () => {
@@ -79,12 +83,19 @@ const App = () => {
 
           const res = await axios.put(url, chunk, {
             onUploadProgress: (progressEvent) => {
-              const chunkProgress =
-                (progressEvent.loaded / progressEvent.total) * 100;
-              console.log(chunkProgress);
-              setUploadProgress((prevProgress) =>
-                chunkProgress > prevProgress ? chunkProgress : prevProgress
+              // save progress of each chunk upload
+              // (add all chunk upload / total file bytes) * 100
+              chunkProgress[partNumber] = {
+                progress: progressEvent.loaded,
+              };
+
+              const totalProgress = Object.values(chunkProgress).reduce(
+                (total, chunk) => total + (chunk.progress || 0),
+                0
               );
+
+              const totalUploadProgress = (totalProgress / fileBytes) * 100;
+              setUploadProgress(totalUploadProgress);
             },
           });
 
@@ -97,7 +108,7 @@ const App = () => {
     const publicUrl = await completeUpload(file.name, uploadId, uploadedParts);
     setUploadedFileUrl(publicUrl);
     setFileType(file.type);
-    setUploadProgress(100);
+    // setUploadProgress(100);
   };
 
   // Displays file preview
