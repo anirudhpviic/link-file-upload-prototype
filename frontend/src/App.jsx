@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import pLimit from "p-limit";
 
-const CHUNK_SIZE = 15 * 1024 * 1024;
+const CHUNK_SIZE = 500 * 1024 * 1024;
 
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
@@ -20,13 +20,28 @@ const App = () => {
     return res.data.data;
   };
 
-  const completeUpload = async (fileName, uploadId, uploadedParts) => {
+  const completeUpload = async (
+    fileName,
+    uploadId,
+    uploadedParts,
+    fileSize,
+    fileExtension
+  ) => {
+    const token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzlhMTA3NDhhNTQ5MTU4YmY3MmQxZTciLCJkZXBhcnRtZW50IjoiSFIiLCJ1c2VyTmFtZSI6ImFuaXJ1ZGhhZG1pbiIsInByb2ZpbGVJbWciOiJodHRwczovL2ZpcmViYXNlc3RvcmFnZS5nb29nbGVhcGlzLmNvbS92MC9iL2xpbmstODFhOTAuYXBwc3BvdC5jb20vby9JTUdfMjAyMzEwMjdfMTA0ODIyLmpwZz9hbHQ9bWVkaWEmdG9rZW49ZTEwZjZlODUtMjI2ZC00NGNlLTkzZTItNDgwYTY3ZDU0ZmVmIiwidXNlckVtYWlsIjoiYW5pcnVkaGFkbWluMTIzQGdtYWlsLmNvbSIsImlhdCI6MTczODU3ODY1OSwiZXhwIjoxNzQxMTcwNjU5fQ.4_zAGTq-FfmDOSNgRlEAp1oq0duue_8n8Pc2LNMadvE";
     const res = await axios.post(
       "http://localhost:3000/archive/complete-upload",
       {
         fileName,
         uploadId,
         parts: uploadedParts,
+        fileSize,
+        fileExtension,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
     );
     return res.data.data; // public url
@@ -59,6 +74,7 @@ const App = () => {
   };
 
   const uploadFile = async (file) => {
+    console.log("files", file);
     const limit = pLimit(6); // 6 concurrent uploads
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = fileBuffer.byteLength;
@@ -71,6 +87,9 @@ const App = () => {
       file.name,
       totalChunks
     );
+
+    console.log("preSignedUrls", preSignedUrls);
+    console.log("uploadId", uploadId);
 
     let uploadedParts = [];
 
@@ -105,7 +124,16 @@ const App = () => {
       )
     );
 
-    const publicUrl = await completeUpload(file.name, uploadId, uploadedParts);
+    const publicUrl = await completeUpload(
+      file.name,
+      uploadId,
+      uploadedParts,
+      file.size,
+      file.name.split(".")[1]
+    );
+
+    console.log("publicUrl", publicUrl);
+
     setUploadedFileUrl(publicUrl);
     setFileType(file.type);
     // setUploadProgress(100);
