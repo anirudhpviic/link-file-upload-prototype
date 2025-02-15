@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import axios from "axios";
 import pLimit from "p-limit";
 
-const CHUNK_SIZE = 500 * 1024 * 1024;
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const token =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzlhMTA3NDhhNTQ5MTU4YmY3MmQxZTciLCJkZXBhcnRtZW50IjoiSFIiLCJ1c2VyTmFtZSI6ImFuaXJ1ZGhhZG1pbiIsInByb2ZpbGVJbWciOiJodHRwczovL2ZpcmViYXNlc3RvcmFnZS5nb29nbGVhcGlzLmNvbS92MC9iL2xpbmstODFhOTAuYXBwc3BvdC5jb20vby9JTUdfMjAyMzEwMjdfMTA0ODIyLmpwZz9hbHQ9bWVkaWEmdG9rZW49ZTEwZjZlODUtMjI2ZC00NGNlLTkzZTItNDgwYTY3ZDU0ZmVmIiwidXNlckVtYWlsIjoiYW5pcnVkaGFkbWluMTIzQGdtYWlsLmNvbSIsImlhdCI6MTczODU3ODY1OSwiZXhwIjoxNzQxMTcwNjU5fQ.4_zAGTq-FfmDOSNgRlEAp1oq0duue_8n8Pc2LNMadvE";
 
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
@@ -10,41 +12,50 @@ const App = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const getPreSignedUrls = async (fileName, totalChunks) => {
-    const res = await axios.post(
-      "http://localhost:3000/archive/presigned-url",
-      {
-        fileName,
-        totalChunks,
-      }
-    );
-    return res.data.data;
+    try {
+      const res = await axios.post(
+        "http://localhost:3000/archive/presigned-url",
+        {
+          fileName,
+          totalChunks,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return res.data.data;
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const completeUpload = async (
-    fileName,
+    uniqueFileName,
     uploadId,
     uploadedParts,
     fileSize,
-    fileExtension
   ) => {
-    const token =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzlhMTA3NDhhNTQ5MTU4YmY3MmQxZTciLCJkZXBhcnRtZW50IjoiSFIiLCJ1c2VyTmFtZSI6ImFuaXJ1ZGhhZG1pbiIsInByb2ZpbGVJbWciOiJodHRwczovL2ZpcmViYXNlc3RvcmFnZS5nb29nbGVhcGlzLmNvbS92MC9iL2xpbmstODFhOTAuYXBwc3BvdC5jb20vby9JTUdfMjAyMzEwMjdfMTA0ODIyLmpwZz9hbHQ9bWVkaWEmdG9rZW49ZTEwZjZlODUtMjI2ZC00NGNlLTkzZTItNDgwYTY3ZDU0ZmVmIiwidXNlckVtYWlsIjoiYW5pcnVkaGFkbWluMTIzQGdtYWlsLmNvbSIsImlhdCI6MTczODU3ODY1OSwiZXhwIjoxNzQxMTcwNjU5fQ.4_zAGTq-FfmDOSNgRlEAp1oq0duue_8n8Pc2LNMadvE";
-    const res = await axios.post(
-      "http://localhost:3000/archive/complete-upload",
-      {
-        fileName,
-        uploadId,
-        parts: uploadedParts,
-        fileSize,
-        fileExtension,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    try {
+      const res = await axios.post(
+        "http://localhost:3000/archive/complete-upload",
+        {
+          fileName: uniqueFileName,
+          uploadId,
+          parts: uploadedParts,
+          fileSize,
         },
-      }
-    );
-    return res.data.data; // public url
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return res.data.data; // public url
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const getDynamicChunks = (
@@ -73,8 +84,7 @@ const App = () => {
     return { chunks, totalChunks };
   };
 
-  const uploadFile = async (file) => {
-    console.log("files", file);
+  const uploadVideoFile = async (file) => {
     const limit = pLimit(6); // 6 concurrent uploads
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = fileBuffer.byteLength;
@@ -83,13 +93,10 @@ const App = () => {
 
     const { chunks, totalChunks } = getDynamicChunks(file.size, CHUNK_SIZE);
 
-    const { uploadId, preSignedUrls } = await getPreSignedUrls(
+    const { uploadId, preSignedUrls, uniqueFileName } = await getPreSignedUrls(
       file.name,
       totalChunks
     );
-
-    console.log("preSignedUrls", preSignedUrls);
-    console.log("uploadId", uploadId);
 
     let uploadedParts = [];
 
@@ -103,7 +110,6 @@ const App = () => {
           const res = await axios.put(url, chunk, {
             onUploadProgress: (progressEvent) => {
               // save progress of each chunk upload
-              // (add all chunk upload / total file bytes) * 100
               chunkProgress[partNumber] = {
                 progress: progressEvent.loaded,
               };
@@ -124,19 +130,16 @@ const App = () => {
       )
     );
 
+    // uniqueFileName is important it used to stop overriding existing files
     const publicUrl = await completeUpload(
-      file.name,
+      uniqueFileName,
       uploadId,
       uploadedParts,
       file.size,
-      file.name.split(".")[1]
     );
-
-    console.log("publicUrl", publicUrl);
 
     setUploadedFileUrl(publicUrl);
     setFileType(file.type);
-    // setUploadProgress(100);
   };
 
   // Displays file preview
@@ -155,7 +158,7 @@ const App = () => {
   return (
     <div style={{ width: "70%", height: "50vh", border: "1px solid yellow" }}>
       <h2>Chunked File Upload</h2>
-      <input type="file" onChange={(e) => uploadFile(e.target.files[0])} />
+      <input type="file" onChange={(e) => uploadVideoFile(e.target.files[0])} />
 
       {/* Progress Bar */}
       {uploadProgress > 0 && (
