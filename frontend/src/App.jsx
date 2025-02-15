@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import pLimit from "p-limit";
 
-const CHUNK_SIZE = 5 * 1024 * 1024;
+const CHUNK_SIZE = 500 * 1024 * 1024;
 const token =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzlhMTA3NDhhNTQ5MTU4YmY3MmQxZTciLCJkZXBhcnRtZW50IjoiSFIiLCJ1c2VyTmFtZSI6ImFuaXJ1ZGhhZG1pbiIsInByb2ZpbGVJbWciOiJodHRwczovL2ZpcmViYXNlc3RvcmFnZS5nb29nbGVhcGlzLmNvbS92MC9iL2xpbmstODFhOTAuYXBwc3BvdC5jb20vby9JTUdfMjAyMzEwMjdfMTA0ODIyLmpwZz9hbHQ9bWVkaWEmdG9rZW49ZTEwZjZlODUtMjI2ZC00NGNlLTkzZTItNDgwYTY3ZDU0ZmVmIiwidXNlckVtYWlsIjoiYW5pcnVkaGFkbWluMTIzQGdtYWlsLmNvbSIsImlhdCI6MTczODU3ODY1OSwiZXhwIjoxNzQxMTcwNjU5fQ.4_zAGTq-FfmDOSNgRlEAp1oq0duue_8n8Pc2LNMadvE";
 
@@ -35,7 +35,7 @@ const App = () => {
     uniqueFileName,
     uploadId,
     uploadedParts,
-    fileSize,
+    fileSize
   ) => {
     try {
       const res = await axios.post(
@@ -131,11 +131,11 @@ const App = () => {
     );
 
     // uniqueFileName is important it used to stop overriding existing files
-    const publicUrl = await completeUpload(
+    const { publicUrl } = await completeUpload(
       uniqueFileName,
       uploadId,
       uploadedParts,
-      file.size,
+      file.size
     );
 
     setUploadedFileUrl(publicUrl);
