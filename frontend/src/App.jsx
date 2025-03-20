@@ -3,6 +3,7 @@ import axios from "axios";
 import pLimit from "p-limit";
 
 const CHUNK_SIZE = 500 * 1024 * 1024;
+const MIN_CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
 const token =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzlhMTA3NDhhNTQ5MTU4YmY3MmQxZTciLCJkZXBhcnRtZW50IjoiSFIiLCJ1c2VyTmFtZSI6ImFuaXJ1ZGhhZG1pbiIsInByb2ZpbGVJbWciOiJodHRwczovL2ZpcmViYXNlc3RvcmFnZS5nb29nbGVhcGlzLmNvbS92MC9iL2xpbmstODFhOTAuYXBwc3BvdC5jb20vby9JTUdfMjAyMzEwMjdfMTA0ODIyLmpwZz9hbHQ9bWVkaWEmdG9rZW49ZTEwZjZlODUtMjI2ZC00NGNlLTkzZTItNDgwYTY3ZDU0ZmVmIiwidXNlckVtYWlsIjoiYW5pcnVkaGFkbWluMTIzQGdtYWlsLmNvbSIsImlhdCI6MTczODU3ODY1OSwiZXhwIjoxNzQxMTcwNjU5fQ.4_zAGTq-FfmDOSNgRlEAp1oq0duue_8n8Pc2LNMadvE";
 
@@ -14,7 +15,7 @@ const App = () => {
   const getPreSignedUrls = async (fileName, totalChunks) => {
     try {
       const res = await axios.post(
-        "http://localhost:3000/archive/presigned-url",
+        "http://localhost:3000/chats/presigned-url",
         {
           fileName,
           totalChunks,
@@ -39,7 +40,7 @@ const App = () => {
   ) => {
     try {
       const res = await axios.post(
-        "http://localhost:3000/archive/complete-upload",
+        "http://localhost:3000/chats/complete-upload",
         {
           fileName: uniqueFileName,
           uploadId,
@@ -58,11 +59,7 @@ const App = () => {
     }
   };
 
-  const getDynamicChunks = (
-    fileSize,
-    chunkSize,
-    minChunkSize = 5 * 1024 * 1024
-  ) => {
+  const getDynamicChunks = (fileSize, chunkSize, minChunkSize) => {
     let totalChunks = Math.ceil(fileSize / chunkSize);
     let chunks = [];
 
@@ -84,19 +81,40 @@ const App = () => {
     return { chunks, totalChunks };
   };
 
-  const uploadVideoFile = async (file) => {
+  const uploadFile = async (file) => {
     const limit = pLimit(6); // 6 concurrent uploads
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = fileBuffer.byteLength;
 
     let chunkProgress = {}; // Store progress for each chunk
 
-    const { chunks, totalChunks } = getDynamicChunks(file.size, CHUNK_SIZE);
 
-    const { uploadId, preSignedUrls, uniqueFileName } = await getPreSignedUrls(
+    let chunks;
+    let totalChunks;
+
+    console.log("fileSizeInMB", file.size);
+    console.log("Min chunk size", MIN_CHUNK_SIZE);
+
+    if (file.size > MIN_CHUNK_SIZE) {
+
+      console.log("seprate")
+      const result = getDynamicChunks(file.size, CHUNK_SIZE, MIN_CHUNK_SIZE);
+
+      chunks = result.chunks;
+      totalChunks = result.totalChunks;
+    } else {
+      chunks = [{ start: 0, end: CHUNK_SIZE }];
+      totalChunks = 1;
+    }
+
+    const { uploadId, preSignedUrls, fileName } = await getPreSignedUrls(
       file.name,
       totalChunks
     );
+
+    console.log("uniqurFileName:", fileName);
+    console.log("chunks",chunks)
+    console.log("totalChunks",totalChunks)
 
     let uploadedParts = [];
 
@@ -132,12 +150,13 @@ const App = () => {
 
     // uniqueFileName is important it used to stop overriding existing files
     const { publicUrl } = await completeUpload(
-      uniqueFileName,
+      fileName,
       uploadId,
       uploadedParts,
       file.size
     );
 
+    console.log("public url: ", publicUrl);
     setUploadedFileUrl(publicUrl);
     setFileType(file.type);
   };
@@ -158,7 +177,7 @@ const App = () => {
   return (
     <div style={{ width: "70%", height: "50vh", border: "1px solid yellow" }}>
       <h2>Chunked File Upload</h2>
-      <input type="file" onChange={(e) => uploadVideoFile(e.target.files[0])} />
+      <input type="file" onChange={(e) => uploadFile(e.target.files[0])} />
 
       {/* Progress Bar */}
       {uploadProgress > 0 && (
