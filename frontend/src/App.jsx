@@ -5,7 +5,7 @@ import pLimit from "p-limit";
 const CHUNK_SIZE = 500 * 1024 * 1024;
 const MIN_CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
 const token =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzlhMTA3NDhhNTQ5MTU4YmY3MmQxZTciLCJkZXBhcnRtZW50IjoiSFIiLCJ1c2VyTmFtZSI6ImFuaXJ1ZGhhZG1pbiIsInByb2ZpbGVJbWciOiJodHRwczovL2ZpcmViYXNlc3RvcmFnZS5nb29nbGVhcGlzLmNvbS92MC9iL2xpbmstODFhOTAuYXBwc3BvdC5jb20vby9JTUdfMjAyMzEwMjdfMTA0ODIyLmpwZz9hbHQ9bWVkaWEmdG9rZW49ZTEwZjZlODUtMjI2ZC00NGNlLTkzZTItNDgwYTY3ZDU0ZmVmIiwidXNlckVtYWlsIjoiYW5pcnVkaGFkbWluMTIzQGdtYWlsLmNvbSIsImlhdCI6MTczODU3ODY1OSwiZXhwIjoxNzQxMTcwNjU5fQ.4_zAGTq-FfmDOSNgRlEAp1oq0duue_8n8Pc2LNMadvE";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2Nzk4YmQwNWRjMzVhYjZlOGI2ODg5NTAiLCJkZXBhcnRtZW50IjoiREVWRUxPUEVSIiwidXNlck5hbWUiOiJhbmlydWRoIiwicHJvZmlsZUltZyI6Imh0dHBzOi8vZmlyZWJhc2VzdG9yYWdlLmdvb2dsZWFwaXMuY29tL3YwL2IvbGluay04MWE5MC5hcHBzcG90LmNvbS9vL0lNR18yMDIzMTAyN18xMDQ4MjIuanBnP2FsdD1tZWRpYSZ0b2tlbj1lMTBmNmU4NS0yMjZkLTQ0Y2UtOTNlMi00ODBhNjdkNTRmZWYiLCJ1c2VyRW1haWwiOiJhbmlydWRoMTIzQGdtYWlsLmNvbSIsImlhdCI6MTc0MjI4MTEwOSwiZXhwIjoxNzQ0ODczMTA5fQ.zv72nzMMxUHYBSeLzCdFn3zZeNVXO2MhK7_W2tOvZEA";
 
 const App = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
@@ -32,12 +32,14 @@ const App = () => {
     }
   };
 
-  const completeUpload = async (
+  const completeUpload = async ({
     uniqueFileName,
     uploadId,
     uploadedParts,
-    fileSize
-  ) => {
+    fileSize,
+    channelId,
+    message,
+  }) => {
     try {
       const res = await axios.post(
         "http://localhost:3000/chats/complete-upload",
@@ -46,6 +48,8 @@ const App = () => {
           uploadId,
           parts: uploadedParts,
           fileSize,
+          channelId,
+          message,
         },
         {
           headers: {
@@ -53,6 +57,7 @@ const App = () => {
           },
         }
       );
+      console.log("response", res);
       return res.data.data; // public url
     } catch (error) {
       console.error(error);
@@ -88,7 +93,6 @@ const App = () => {
 
     let chunkProgress = {}; // Store progress for each chunk
 
-
     let chunks;
     let totalChunks;
 
@@ -96,8 +100,7 @@ const App = () => {
     console.log("Min chunk size", MIN_CHUNK_SIZE);
 
     if (file.size > MIN_CHUNK_SIZE) {
-
-      console.log("seprate")
+      console.log("seprate");
       const result = getDynamicChunks(file.size, CHUNK_SIZE, MIN_CHUNK_SIZE);
 
       chunks = result.chunks;
@@ -107,14 +110,13 @@ const App = () => {
       totalChunks = 1;
     }
 
-    const { uploadId, preSignedUrls, fileName } = await getPreSignedUrls(
-      file.name,
-      totalChunks
-    );
+    // need to use return fileName this is unique created from backend
+    const { uploadId, preSignedUrls, fileName, fileUrl } =
+      await getPreSignedUrls(file.name, totalChunks);
 
     console.log("uniqurFileName:", fileName);
-    console.log("chunks",chunks)
-    console.log("totalChunks",totalChunks)
+    console.log("chunks", chunks);
+    console.log("totalChunks", totalChunks);
 
     let uploadedParts = [];
 
@@ -149,16 +151,25 @@ const App = () => {
     );
 
     // uniqueFileName is important it used to stop overriding existing files
-    const { publicUrl } = await completeUpload(
-      fileName,
+    await completeUpload({
+      uniqueFileName: fileName,
       uploadId,
       uploadedParts,
-      file.size
-    );
+      fileSize: file.size,
+      channelId: "67d27ba96cf1aa7c944d4bdd",
+      message: {
+        file: fileUrl,
+        message: "hi file",
+        meta: {
+          message: "hi file",
+          data: "meta checking",
+        },
+      },
+    });
 
-    console.log("public url: ", publicUrl);
-    setUploadedFileUrl(publicUrl);
-    setFileType(file.type);
+    // console.log("public url: ", publicUrl);
+    // setUploadedFileUrl(publicUrl);
+    // setFileType(file.type);
   };
 
   // Displays file preview
